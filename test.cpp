@@ -7,7 +7,7 @@ int main(int argc,char *argv[]) {
 	string testip = "10.1.10.1";
 	string testport = "10232";
 
-	mtorrent newtor;
+	mtorrent newtor,copytor;
 
 	newtor.set_tracker(0,testip,testport);
 	newtor.set_tracker(1,testip,testport);
@@ -16,6 +16,10 @@ int main(int argc,char *argv[]) {
 	newtor.create_file(string(argv[2]));
 
 	printf("Hash size : %d",newtor.hash.size());
+
+	copytor.read_file(string(argv[2]));
+	copytor.print_data_term();
+
 }
 
 	

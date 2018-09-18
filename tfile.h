@@ -2,6 +2,9 @@
 #include<string>
 #include<openssl/sha.h>
 #include<cstring>
+#include<cstdlib>
+#include<iostream>
+
 #define FILE_TYPE_DISK 1
 #define FILE_TYPE_NET  2
 #define SHA_FILE_DIV   512
@@ -25,7 +28,8 @@ class mtorrent {
 	void create_from_file(std::string file_path);
 	void create_file(std::string path);
 	
-	
+	void read_file(std::string path);	
+	void print_data_term();	
 };
 
 

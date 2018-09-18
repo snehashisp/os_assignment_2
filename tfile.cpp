@@ -12,19 +12,29 @@ void mtorrent :: set_tracker(int t_no,string ip,string port) {
 void mtorrent :: create_from_file(string file_path) {
 
 	char data[SHA_FILE_DIV * BLOCK_SIZE];
-	this->file_path = file_path;
+	
+	char real_path[1024];
+	realpath(file_path.c_str(),real_path);
+	string temp = string(real_path);
+	this->file_name = temp.substr(temp.find_last_of("/")+1);
+	this->file_path = temp;
+
 	FILE *file = fopen(file_path.c_str(),"r");
-	char temphash[20];
-	strcpy(temphash,"");
+	unsigned char temphash[20];
 	file_size = 0;
 
 	hash = "";
 	long long temp_size = 0;
-	while((temp_size = fread(data,1,SHA_FILE_DIV * 1024,file)) > 0) {
+	char word[3];
+	while((temp_size = fread(data,1,SHA_FILE_DIV * BLOCK_SIZE,file)) > 0) {
 		
 		SHA1((unsigned char*)data,temp_size,(unsigned char*)temphash);
-		hash = hash + string(temphash);
+		for(int i=0;i<20;i++) {
+			sprintf(word,"%02x",temphash[i]);	
+			hash += string(word);
+		}
 		file_size += temp_size;
+
 	}
 	
 	file_type = FILE_TYPE_DISK;
@@ -49,6 +59,51 @@ void mtorrent :: create_file(string path) {
 
 	fclose(file);
 }
+
+
+void mtorrent :: read_file(std::string path) {
+
+	FILE *fp = fopen(path.c_str(),"r");
+	char buffer[SHA_FILE_DIV * BLOCK_SIZE];
+	
+	for(int i=0;i<TRACKERS;i++) {
+		fscanf(fp,"%s",buffer);
+		tracker_ip[i] = string(buffer);
+		fscanf(fp,"%s",buffer);
+		tracker_port[i] = string(buffer);
+	}
+
+	fscanf(fp,"%s",buffer);
+	this->file_name = string(buffer);
+
+	fscanf(fp,"%s",buffer);
+	file_type = FILE_TYPE_NET;
+	
+	fscanf(fp,"%s",buffer);
+	file_path = string(buffer);
+	fscanf(fp,"%s",buffer);
+	file_size = atoi(buffer);
+	fscanf(fp,"%s",buffer);
+	hash = string(buffer);
+
+}
+
+void mtorrent :: print_data_term() {
+
+	for(int i=0;i<TRACKERS;i++) {
+
+		cout<<tracker_ip[i]<<"\n";
+		cout<<tracker_port[i]<<"\n";
+	}
+	cout<<file_name<<"\n";
+	cout<<file_size<<"\n";
+	cout<<file_type<<"\n";
+	cout<<file_path<<"\n";
+
+	cout<<hash<<"\n";
+
+}
+
 
 
 
