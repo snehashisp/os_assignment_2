@@ -62,6 +62,8 @@ void tracker :: setup(char *ip,int port,char *torrent_list_file_path,char *log_f
 		torrent_db.insert(pair<string,mtorrent_info>(new_info.torrent_hash_file,new_info));
 	}
 
+	pthread_mutex_init(&db_lock,NULL);
+		
 	
 	printf("Created torrent Database\n");
 	
@@ -76,10 +78,9 @@ void tracker :: runserv() {
 		return;
 	}
 	else printf("server Listening\n");
-	server_status = SERV_LISTEN;
 	
 
-	while(server_status == SERV_LISTEN) {
+	while(1) {
 		
 		client_info new_info;
 		socklen_t len = sizeof(new_info.address);
@@ -90,15 +91,34 @@ void tracker :: runserv() {
 		}
 		else {
 			printf("Connection Established\n");
+			pthread_mutex_lock(&db_lock);
+			
+			if(pthread_attr_init(&(new_info.thread_attr)) != 0) {
+				printf("Error Initializing a thread attribute for this client");
+				continue;
+			}
+			if((pthread_attr_setdetachstate(&(new_info.thread_attr),PTHREAD_CREATE_DETACHED)) != 0) {
+				printf("Error setting thread attribute");
+				continue;
+			}
 			client_db.insert(pair<int,client_info>(new_info.client_socket,new_info));
-			client_thread(&(client_db[new_info.client_socket]));
+			if(pthread_create(&(new_info.client_thread),&(new_info.client_thread),tracker::client_thread,(void*)&(client_db[new_info.client_socket])) != 0) {
+				printf("Error in thread creaation for the client");
+				client_db.erase(client_db.find(new_info.client_socket));
+				continue;
+			}
+			
+			pthread_mutex_unlock(&db_lock);
+
+			//client_thread((void *)&(client_db[new_info.client_socket]));
+
 		}
 		
 	}
 
 }
 
-void tracker :: client_thread(client_info *client_pointer) {
+void tracker :: client_thread(void *client_pointer) {
 
 	client_info *client = (client_info *)client_pointer;
 	int status = 1;
@@ -114,6 +134,7 @@ void tracker :: client_thread(client_info *client_pointer) {
 		char *cmd1 = line;
 		while(*cmd1 && *cmd1 == ' ') cmd1++;
 		cmd1 = strtok(cmd1," ");
+
 		if(strcmp(cmd1,"share") == 0) {
 			create_new_tor(*client);
 		}
@@ -125,14 +146,16 @@ void tracker :: client_thread(client_info *client_pointer) {
 			write(client->client_socket,CONT,strlen(CONT));
 			char hash[HASH_LEN];
 			read(client->client_socket,hash,HASH_LEN);
-			auto rm = torrent_db.find(string(hash));
 			
+			pthread_mutex_lock(&db_lock);
+			auto rm = torrent_db.find(string(hash));
 			if(rm == torrent_db.end()) continue;
 			else {
 				fclose(rm->second.client_list);
 				unlink(rm->second.torrent_hash_file.c_str());
 				torrent_db.erase(rm);
 			}
+			pthread_mutex_unlock(&db_lock);
 		}
 		else if(strcmp(cmd1,"exit") == 0) status = 0;
 			
@@ -140,7 +163,9 @@ void tracker :: client_thread(client_info *client_pointer) {
 
 	printf("Client ID %d Disconnected\n",client->client_socket);
 	close(client->client_socket);
+	pthread_mutex_lock(&db_lock);
 	client_db.erase(client_db.find(client->client_socket));
+	pthread_mutex_unlock(&db_lock);
 	
 }
 
@@ -149,15 +174,15 @@ void tracker :: send_file_data(client_info info) {
 
 	string list;
 
-	printf("seederlist\n");
-	return;
 	write(info.client_socket,CONT,strlen(CONT));
 	char hash[HASH_LEN];
 	read(info.client_socket,hash,HASH_LEN);
 
+	pthread_mutex_lock(&db_lock);
 	if(torrent_db.find(string(hash)) == torrent_db.end()) return;
-
 	mtorrent_info minfo = torrent_db[string(hash)];
+	pthread_mutex_unlock(&db_lock);
+
 	for(int i=0;i<minfo.ip_list.size();i++)
 		list += minfo.ip_list[i] + "," + minfo.port_list[i] + ";";
 	write(info.client_socket,list.c_str(),list.size());
@@ -171,7 +196,6 @@ void tracker :: send_file_data(client_info info) {
 
 void tracker :: create_new_tor(client_info info) {
 	
-	printf("share\n");
 	char hash[HASH_LEN];
 	char filename[FILE_NAME];
 	
@@ -187,9 +211,11 @@ void tracker :: create_new_tor(client_info info) {
 	new_info.port_list.push_back(to_string(address.sin_port));
 	new_info.total_seeds = 1;
 
+	pthread_mutex_lock(&db_lock);
 	torrent_db.insert(pair<string,mtorrent_info>(new_info.torrent_hash_file,new_info));
 	fprintf(torrent_list_file,"\n%s",filename);
 	fprintf(torrent_list_file,"\n%s",hash);
+	pthread_mutex_unlock(&db_lock);
 
 }
 
