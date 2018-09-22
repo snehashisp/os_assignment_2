@@ -14,14 +14,6 @@
 #include<semaphore.h>
 
 
-#define CONT "continue"
-#define CMD_LEN    256
-#define IPLEN       20
-#define POLEN       10
-#define FILE_NAME  256
-#define HASH_LEN  1024
-
-
 
 struct mtorrent_info {
 

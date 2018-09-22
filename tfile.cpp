@@ -9,6 +9,21 @@ void mtorrent :: set_tracker(int t_no,string ip,string port) {
 
 }
 
+
+bool wait_cont(int sockid) {
+
+        string temp = "";
+        char t;
+        do{
+                read(sockid,&t,1);
+                temp += string(&t);
+                printf("%c",t);
+        }while(temp.size() < strlen(CONT));
+
+        if(strcmp(temp.c_str(),CONT) == 0) return true;
+        else return false;
+}
+
 void mtorrent :: create_from_file(string file_path) {
 
 	char data[SHA_FILE_DIV * BLOCK_SIZE];
@@ -69,9 +84,11 @@ void mtorrent :: create_file(string path) {
 }
 
 
-void mtorrent :: read_file(std::string path) {
+bool mtorrent :: read_file(std::string path) {
 
 	FILE *fp = fopen(path.c_str(),"r");
+	if(fp == NULL) return false;
+
 	char buffer[SHA_FILE_DIV * BLOCK_SIZE];
 	
 	for(int i=0;i<TRACKERS;i++) {
@@ -96,6 +113,8 @@ void mtorrent :: read_file(std::string path) {
 	file_hash = string(buffer);
 	fscanf(fp,"%s",buffer);
 	hash = string(buffer);
+
+	return true;
 
 }
 
